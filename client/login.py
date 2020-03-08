@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
-import sys
+import sys, time
 
 import tkinter as tk
 import tkinter.messagebox as tkmsgbox
@@ -35,17 +35,21 @@ class Login(tk.Tk):
         btn.place(x=320,y=230)
 
     def click_login(self):
-        MsgWorker().after_login = self.do_after_login
         MsgWorker().do_exit = self.click_cancel
         MsgWorker().send_msg(msg_lib.build_login_msg(self.name_val.get(), self.pwd_val.get()))
+        self.do_after_login()
 
-    def do_after_login(self, user):
+    def do_after_login(self):
+        while not MsgWorker().login_flag:
+            time.sleep(1)
+
         frame_height = self.winfo_screenheight() - 70
         frame_width = 160
+        frame_left = self.winfo_screenwidth() - frame_width
         self.withdraw()
 
-        main = Main(user=user, width=frame_width, height=frame_height)
-        main.geometry("%sx%s-0+0" % (frame_width, frame_height))
+        main = Main(user=MsgWorker().user_info, width=frame_width, height=frame_height)
+        main.geometry("%sx%s+%s+0" % (frame_width, frame_height, frame_left))
         main.mainloop()
 
         # MsgWorker().alive = False

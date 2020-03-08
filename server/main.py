@@ -9,12 +9,21 @@ logging.basicConfig(format="%(asctime)s %(thread)d %(threadName)s %(message)s",s
 log = logging.getLogger()
 
 user_arr = []
-
+user_lock = threading.Lock()
 def load_user_info(name, pwd):
     u = user.User()
     u.name = name
     u.nick_name = name
     return u
+
+def add_user(new_user):
+    with user_lock:
+        flag = False
+        for u in user_arr:
+            if u.name == new_user.name:
+                flag = True
+        if not flag:
+            user_arr.append(new_user)
 
 class Handler(socketserver.StreamRequestHandler):
     lock = threading.Lock()
@@ -40,7 +49,7 @@ class Handler(socketserver.StreamRequestHandler):
     def handle(self):
         super().handle()
         import io
-        rfile: io.TextIOWrapper = self.rfile
+        rfile = self.rfile
         while not self.event.is_set():
             try:
                 data = rfile.read1(1024)
@@ -53,16 +62,18 @@ class Handler(socketserver.StreamRequestHandler):
             msg_info = msg_lib.parse_msg(data)
             print(msg_info)
             if msg_info:
-                print(msg_info)
                 msg_id = msg_info['msg_id']
                 if msg_id == msg_lib.LOGIN:
-                    u = load_user_info(msg_info['name'], msg_info['pwd'])
+                    u = load_user_info(msg_info['data']['name'], msg_info['data']['pwd'])
+                    add_user(u)
                     with self.lock:
                         self.clients[self.client_address].send(msg_lib.build_online_msg(u))
                 if msg_id == msg_lib.LOGOUT:
                     with self.lock:
-                        if msg_id == msg_lib.LOGOUT:
-                            self.send_all(data)
+                        self.send_all(data)
+                if msg_id == msg_lib.GET_USER_INFOS:
+                    with self.lock:
+                        self.clients[self.client_address].send(msg_lib.build_all_users_msg(user_arr))
 
     def finish(self):
         super().finish()
@@ -74,7 +85,7 @@ class Handler(socketserver.StreamRequestHandler):
         log.info("{}退出了".format(self.client_address))
 
 if __name__ == "__main__":
-    server = socketserver.ThreadingTCPServer(("127.0.0.1",3999),Handler)
+    server = socketserver.ThreadingTCPServer(("127.0.0.1", msg_lib.PORT),Handler)
     server.daemon_threads = True  #设置所有创建的线程都为Daemo线程
     threading.Thread(target=server.serve_forever,name="server",daemon=True).start()
     while True:
