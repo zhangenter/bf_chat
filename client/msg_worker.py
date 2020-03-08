@@ -6,7 +6,7 @@ from common.user import User
 class MsgWorker(object):
     _instance = None
     alive = True
-    login_flag = False
+    login_flag = 0
     user_info = None
 
     do_exit = None
@@ -24,20 +24,31 @@ class MsgWorker(object):
         return cls._instance
 
     def do_recv(self):
+        full_bytes = b''
         while self.alive:
-            bytes = self.tcp_client_sock.recv(1024)
-            msg_info = msg_lib.parse_msg(bytes)
+            read_bytes = self.tcp_client_sock.recv(1024)
+            full_bytes += read_bytes
+            if len(full_bytes) < 6:
+                full_bytes = b''
+                continue
+            if not msg_lib.is_msg_valid(full_bytes):
+                continue
+
+            msg_info = msg_lib.parse_msg(full_bytes)
             if msg_info:
                 msg_id = msg_info['msg_id']
-                if msg_id == msg_lib.ONLINE:
+                if msg_id == msg_lib.LOGIN_FAIL:
+                    self.login_flag = 2
+                elif msg_id == msg_lib.ONLINE:
                     self.user_info = msg_info['data']
-                    self.login_flag = True
-                if msg_id == msg_lib.LOGOUT:
+                    self.login_flag = 1
+                elif msg_id == msg_lib.LOGOUT:
                     if self.do_exit:
                         self.do_exit()
-                if msg_id == msg_lib.ALL_USER_INFOS:
+                elif msg_id == msg_lib.ALL_USER_INFOS:
                     if self.do_update:
                         self.do_update(msg_info['data'])
+            full_bytes = b''
 
     def send_msg(self, bytes):
         self._instance.tcp_client_sock.send(bytes)

@@ -35,13 +35,30 @@ class Login(tk.Tk):
         btn.place(x=320,y=230)
 
     def click_login(self):
+        if len(self.name_val.get()) == 0:
+            tkmsgbox.showerror('登录错误', '请输入用户名')
+            return
+
+        if len(self.pwd_val.get()) == 0:
+            tkmsgbox.showerror('登录错误', '请输入密码')
+            return
+
         MsgWorker().do_exit = self.click_cancel
-        MsgWorker().send_msg(msg_lib.build_login_msg(self.name_val.get(), self.pwd_val.get()))
+
+        import hashlib
+        md5 = hashlib.md5()
+        md5.update(self.pwd_val.get().encode())
+        md5_pwd = md5.hexdigest()
+        MsgWorker().send_msg(msg_lib.build_login_msg(self.name_val.get(), md5_pwd))
         self.do_after_login()
 
     def do_after_login(self):
-        while not MsgWorker().login_flag:
-            time.sleep(1)
+        while MsgWorker().login_flag == 0:
+            time.sleep(0.1)
+
+        if MsgWorker().login_flag == 2:
+            tkmsgbox.showerror('登录错误', '用户名或密码无效')
+            return
 
         frame_height = self.winfo_screenheight() - 70
         frame_width = 160

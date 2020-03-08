@@ -1,29 +1,15 @@
 import logging
 import sys
+from struct import pack,unpack
 import socketserver
 import socket
 import threading
 from common import msg_lib,user
+from server.msg_db import add_user, get_all_users, load_user_info
 
 logging.basicConfig(format="%(asctime)s %(thread)d %(threadName)s %(message)s",stream=sys.stdout,level=logging.INFO)
 log = logging.getLogger()
 
-user_arr = []
-user_lock = threading.Lock()
-def load_user_info(name, pwd):
-    u = user.User()
-    u.name = name
-    u.nick_name = name
-    return u
-
-def add_user(new_user):
-    with user_lock:
-        flag = False
-        for u in user_arr:
-            if u.name == new_user.name:
-                flag = True
-        if not flag:
-            user_arr.append(new_user)
 
 class Handler(socketserver.StreamRequestHandler):
     lock = threading.Lock()
@@ -50,30 +36,40 @@ class Handler(socketserver.StreamRequestHandler):
         super().handle()
         import io
         rfile = self.rfile
+        full_bytes = b''
         while not self.event.is_set():
             try:
-                data = rfile.read1(1024)
+                read_bytes = rfile.read1(1024)
             except Exception as e:
                 log.error(e)
-                data = b""
-            log.info(data)
-            if data == b"by" or data == b"":
                 break
-            msg_info = msg_lib.parse_msg(data)
-            print(msg_info)
+
+            full_bytes += read_bytes
+            if len(full_bytes) < 6:
+                full_bytes = ''
+                continue
+
+            if not msg_lib.is_msg_valid(full_bytes):
+                continue
+
+            msg_info = msg_lib.parse_msg(full_bytes)
             if msg_info:
                 msg_id = msg_info['msg_id']
                 if msg_id == msg_lib.LOGIN:
                     u = load_user_info(msg_info['data']['name'], msg_info['data']['pwd'])
-                    add_user(u)
                     with self.lock:
-                        self.clients[self.client_address].send(msg_lib.build_online_msg(u))
+                        if u:
+                            self.clients[self.client_address].send(msg_lib.build_online_msg(u))
+                        else:
+                            self.clients[self.client_address].send(msg_lib.build_login_fail_msg())
                 if msg_id == msg_lib.LOGOUT:
                     with self.lock:
-                        self.send_all(data)
+                        self.send_all(full_bytes)
                 if msg_id == msg_lib.GET_USER_INFOS:
+                    user_arr = get_all_users()
                     with self.lock:
                         self.clients[self.client_address].send(msg_lib.build_all_users_msg(user_arr))
+            full_bytes = b''
 
     def finish(self):
         super().finish()
@@ -84,15 +80,19 @@ class Handler(socketserver.StreamRequestHandler):
         self.request.close()
         log.info("{}退出了".format(self.client_address))
 
-if __name__ == "__main__":
-    server = socketserver.ThreadingTCPServer(("127.0.0.1", msg_lib.PORT),Handler)
-    server.daemon_threads = True  #设置所有创建的线程都为Daemo线程
-    threading.Thread(target=server.serve_forever,name="server",daemon=True).start()
+def run():
+    server = socketserver.ThreadingTCPServer(("127.0.0.1", msg_lib.PORT), Handler)
+    server.daemon_threads = True  # 设置所有创建的线程都为Daemo线程
+    threading.Thread(target=server.serve_forever, name="server", daemon=True).start()
     while True:
         cmd = input(">>>")
         if cmd.strip() == "quit":
-            server.shutdown() #告诉serve_forever循环停止。
+            server.shutdown()  # 告诉serve_forever循环停止。
             server.server_close()
             break
         logging.info(threading.enumerate())
+
+if __name__ == "__main__":
+    run()
+
 

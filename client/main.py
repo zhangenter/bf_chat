@@ -15,17 +15,11 @@ class Main(tk.Tk):
     def __init__(self, user, width=160, height=660):
         super().__init__()
         self.user = user
-        print(self.user)
-        print(dict(self.user))
         self.frame = tk.Frame(self, width=width, height=height)
         self.frame.pack()
         self.resizable(0,0)
 
         self.lb = tk.Listbox(self.frame, width=250, height=56)
-        self.lb.insert(tk.END, self.user.nick_name)
-        self.lb.place(x=0, y=0)
-
-        self.lb.insert(tk.END, 'test')
         self.lb.place(x=0, y=0)
 
         self.protocol("WM_DELETE_WINDOW", self.quit)
@@ -38,7 +32,8 @@ class Main(tk.Tk):
 
     def do_update(self, all_users):
         for user in all_users:
-            print(user.nick_name)
+            print(dict(user))
+            self.lb.insert(tk.END, user.nick_name)
 
     def send(self):
         val = self.sdTxt.get('1.0', tk.END)

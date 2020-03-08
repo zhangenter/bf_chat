@@ -6,12 +6,13 @@ PORT = 3998
 
 LOGIN = 1
 LOGOUT = 2
-MSG = 3
-USER_INFO = 4
-ONLINE = 5
-CONFIRM_LOGIN = 6
-GET_USER_INFOS = 7
-ALL_USER_INFOS = 8
+ONLINE = 3
+CONFIRM_LOGIN = 4
+USER_INFO = 5
+GET_USER_INFOS = 6
+ALL_USER_INFOS = 7
+LOGIN_FAIL = 8
+MSG = 20
 
 class MsgParse(object):
     _instance = None
@@ -30,6 +31,9 @@ class MsgParse(object):
 def build_nopara_msg(msg_id):
     msg_len = 4 + 2 + 2
     return pack('I', msg_len) + pack('H',msg_id) + bytearray(2)
+
+def build_login_fail_msg():
+    return build_nopara_msg(LOGIN_FAIL)
 
 def build_json_msg(msg_id, data):
     body = json.dumps(data).encode()
@@ -90,24 +94,31 @@ def parse_online_msg(bytes):
 def parse_login_msg(bytes):
     name = bytes[6:6+64].decode()
     pwd = bytes[6+64:6+64+64].decode()
-    return {'name': name, 'pwd': pwd}
+    return {'name': name.strip('\0'), 'pwd': pwd.strip('\0')}
 
 def parse_logout_msg(bytes):
     return parse_name_msg(bytes)
 
-def parse_msg(bytes):
-    if len(bytes) < 6:
+def is_msg_valid(read_bytes):
+    if len(read_bytes) < 6:
+        return False
+    n = unpack('I', read_bytes[0:4])[0]
+    if n != len(read_bytes):
+        return False
+
+    return True
+
+def parse_msg(read_bytes):
+    if not is_msg_valid(read_bytes):
         return None
-    n = unpack('I', bytes[0:4])[0]
-    if n != len(bytes):
-        return None
-    msg_id = unpack('H', bytes[4:6])[0]
+
+    msg_id = unpack('H', read_bytes[4:6])[0]
 
     if msg_id in MsgParse().parser_dic:
-        data = MsgParse().parser_dic[msg_id](bytes)
+        data = MsgParse().parser_dic[msg_id](read_bytes)
         return {'msg_id':msg_id,'data':data}
     else:
-        return None
+        return {'msg_id':msg_id}
 
 if __name__ == '__main__':
     from common.user import User
