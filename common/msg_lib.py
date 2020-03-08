@@ -12,7 +12,7 @@ USER_INFO = 5
 GET_USER_INFOS = 6
 ALL_USER_INFOS = 7
 LOGIN_FAIL = 8
-MSG = 20
+CHAT_MSG = 20
 
 class MsgParse(object):
     _instance = None
@@ -25,6 +25,7 @@ class MsgParse(object):
             cls._instance.parser_dic[USER_INFO] = parse_userinfo_msg
             cls._instance.parser_dic[ONLINE] = parse_online_msg
             cls._instance.parser_dic[ALL_USER_INFOS] = parse_all_user_info_msg
+            cls._instance.parser_dic[CHAT_MSG] = parse_chat_msg
 
         return cls._instance
 
@@ -66,11 +67,18 @@ def build_all_users_msg(users):
         arr.append(dict(user))
     return build_json_msg(ALL_USER_INFOS, arr)
 
+def build_chat_msg(ufrom, uto, val):
+    return build_json_msg(CHAT_MSG, {'from':ufrom, 'to':uto, 'val':val})
+
+
 def parse_json_msg(bytes):
     msg_len = unpack('I', bytes[:4])[0]
     body = bytes[6:msg_len - 2].decode()
     data = json.loads(body)
     return data
+
+def parse_chat_msg(bytes):
+    return parse_json_msg(bytes)
 
 def parse_userinfo_msg(bytes):
     user_dic = parse_json_msg(bytes)

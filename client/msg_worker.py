@@ -11,6 +11,7 @@ class MsgWorker(object):
 
     do_exit = None
     do_update = None
+    do_recv_msg = None
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -48,6 +49,9 @@ class MsgWorker(object):
                 elif msg_id == msg_lib.ALL_USER_INFOS:
                     if self.do_update:
                         self.do_update(msg_info['data'])
+                elif msg_id == msg_lib.CHAT_MSG:
+                    if self.do_recv_msg:
+                        self.do_recv_msg(msg_info['data'])
             full_bytes = b''
 
     def send_msg(self, bytes):

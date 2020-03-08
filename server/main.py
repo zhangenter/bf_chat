@@ -14,6 +14,7 @@ log = logging.getLogger()
 class Handler(socketserver.StreamRequestHandler):
     lock = threading.Lock()
     clients = {}
+    name2client = {}
 
     def setup(self):
         super().setup()
@@ -46,7 +47,7 @@ class Handler(socketserver.StreamRequestHandler):
 
             full_bytes += read_bytes
             if len(full_bytes) < 6:
-                full_bytes = ''
+                full_bytes = b''
                 continue
 
             if not msg_lib.is_msg_valid(full_bytes):
@@ -57,6 +58,7 @@ class Handler(socketserver.StreamRequestHandler):
                 msg_id = msg_info['msg_id']
                 if msg_id == msg_lib.LOGIN:
                     u = load_user_info(msg_info['data']['name'], msg_info['data']['pwd'])
+                    self.name2client[u.name] = self.client_address
                     with self.lock:
                         if u:
                             self.clients[self.client_address].send(msg_lib.build_online_msg(u))
@@ -69,6 +71,13 @@ class Handler(socketserver.StreamRequestHandler):
                     user_arr = get_all_users()
                     with self.lock:
                         self.clients[self.client_address].send(msg_lib.build_all_users_msg(user_arr))
+                if msg_id == msg_lib.CHAT_MSG:
+                    ufrom = msg_info['data']['from']
+                    uto = msg_info['data']['to']
+                    val = msg_info['data']['val']
+                    to_address = self.name2client[uto]
+                    self.clients[to_address].send(full_bytes)
+
             full_bytes = b''
 
     def finish(self):

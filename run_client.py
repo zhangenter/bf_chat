@@ -1,6 +1,10 @@
+import sys
 from client.login import Login
+from PyQt5.QtWidgets import QApplication
 
 if __name__ == '__main__':
+    app = QApplication(sys.argv)
+
     login = Login()
-    login.title(u'登录')
-    login.mainloop()
+
+    sys.exit(app.exec_())
